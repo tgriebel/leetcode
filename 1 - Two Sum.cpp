@@ -5,7 +5,6 @@ public:
         unordered_map<int,int> lut;
         result.reserve( 2 );
         const int listSize = nums.size();
-        //lut.reserve( listSize );
         
         for( int i = 0; i < listSize; ++i ) {
             const int num = nums[ i ];
