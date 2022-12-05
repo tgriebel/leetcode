@@ -1,6 +1,9 @@
 class Solution {
 public:
     inline bool isValid(vector<vector<int>>& image, int sr, int sc, int targetColor, int replaceColor) {
+        if( ( sr < 0 ) || ( sc < 0 ) ) {
+            return false;
+        }
         if( sr >= image.size() ) {
             return false;
         }
