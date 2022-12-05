@@ -1,6 +1,9 @@
 class Solution {
 public:
     int mark(vector<vector<char>>& grid, vector<vector<bool>>& marked, int sr, int sc) {
+        if( ( sr < 0 ) || ( sc < 0 ) ) {
+            return 0;
+        }
         if( sr >= grid.size() ) {
             return 0;
         }
