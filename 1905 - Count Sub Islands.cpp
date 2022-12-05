@@ -1,6 +1,9 @@
 class Solution {
 public:
     int visit(vector<vector<int>>& grid1, vector<vector<int>>& grid2, vector<vector<int>>& marked, int sr, int sc) {
+        if( ( sr < 0 ) || ( sc < 0 ) ) {
+            return false;
+        }
         if( sr >= grid2.size() ) {
             return 0;
         }
