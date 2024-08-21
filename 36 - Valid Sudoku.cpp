@@ -4,16 +4,16 @@ class Solution {
     static const int numCols = 9;
     static const int subBoxSize = 3;
 
-    inline int getNum( const char pieceCode ) {
+    inline static int getNum( const char pieceCode ) {
         const int result = pieceCode - '.'; // Ascii: . / 0 1 2 ... 9
         return result;
     }
 
-    inline int isValid( const int cellCheck, const int cellValue ) {
-        return ( cellCheck & ( 1 << cellValue ) & ~0x3 ) == 0;
+    inline static bool isValid( const int cellCheck, const int cellValue ) {
+        return !( cellCheck & ( 1 << cellValue ) & bitMask );
     }
 
-    inline void markCell( int& cellCheck, const int cellValue ) {
+    inline static void markCell( int& cellCheck, const int cellValue ) {
         cellCheck |= ( 1 << cellValue );
     }
 
@@ -29,13 +29,9 @@ public:
 
                 const int gridId = ( i / subBoxSize ) + subBoxSize * ( j / subBoxSize );
 
-                if( isValid( rowCheck[ j ], num ) == false ) {
-                    return false;
-                }
-                if( isValid( colCheck[ i ], num ) == false ) {
-                    return false;
-                }
-                if( isValid( gridCheck[ gridId ], num ) == false ) {
+                // Rows will finish before grids, grids before columns
+                const bool valid = isValid( rowCheck[ j ], num ) && isValid( gridCheck[ gridId ], num ) && isValid( colCheck[ i ], num );
+                if( valid == false ) {
                     return false;
                 }
                 markCell( rowCheck[ j ], num );
