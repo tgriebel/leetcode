@@ -9,19 +9,19 @@ class Solution {
         return result;
     }
 
-    inline static bool isValid( const int cellCheck, const int cellValue ) {
+    inline static bool isValid( const uint32_t cellCheck, const int cellValue ) {
         return !( cellCheck & ( 1 << cellValue ) & bitMask );
     }
 
-    inline static void markCell( int& cellCheck, const int cellValue ) {
+    inline static void markCell( uint32_t& cellCheck, const int cellValue ) {
         cellCheck |= ( 1 << cellValue );
     }
 
 public:
     bool isValidSudoku(vector<vector<char>>& board) {
-        int rowCheck[ numRows ];
-        int colCheck[ numCols ];
-        int gridCheck[ subBoxSize * subBoxSize ];
+        uint32_t rowCheck[ numRows ];
+        uint32_t colCheck[ numCols ];
+        uint32_t gridCheck[ subBoxSize * subBoxSize ];
 
         for( int j = 0; j < numRows; ++j ) {
             for( int i = 0; i < numCols; ++i ) {
