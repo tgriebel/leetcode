@@ -1,37 +1,30 @@
 class Solution {
-    int getNum( const char pieceCode ) {
-        const int result = pieceCode - '0';
-        if( result >= 1 && result <= 9 ) {
-            return result;
-        }
-        return 0;
+    static const int bitMask = ~0x3; // Ascii values are assigned a bit, starts at '.' in ascii for speed
+    static const int numRows = 9;
+    static const int numCols = 9;
+    static const int subBoxSize = 3;
+
+    inline int getNum( const char pieceCode ) {
+        const int result = pieceCode - '.'; // Ascii: . / 0 1 2 ... 9
+        return result;
     }
 
-    int isValid( const int cellCheck, const int cellValue ) {
-        return ( cellCheck & ( 1 << cellValue ) & ~0x01 ) == 0;
+    inline int isValid( const int cellCheck, const int cellValue ) {
+        return ( cellCheck & ( 1 << cellValue ) & ~0x3 ) == 0;
     }
 
-    void markCell( int& cellCheck, const int cellValue ) {
+    inline void markCell( int& cellCheck, const int cellValue ) {
         cellCheck |= ( 1 << cellValue );
     }
 
 public:
     bool checkSquare( vector<vector<char>>& board, int x, int y ) {
-        const int numRows = board.size();
-        const int numCols = board[ 0 ].size();
-
-        const int subBoxSize = 3;
-
-        if( y + 3 > numRows ) {
-            return false;
-        }
-        if( x + 3 > numCols ) {
-            return false;
-        }
+        const int subBoxEndX = (x + subBoxSize);
+        const int subBoxEndY = (y + subBoxSize);
 
         int numCheck = 0;
-        for( int j = y; j < (y + subBoxSize); ++j ) {
-            for( int i = x; i < (x + subBoxSize); ++i ) {
+        for( int j = y; j < subBoxEndY; ++j ) {
+            for( int i = x; i < subBoxEndX; ++i ) {
                 const int num = getNum( board[ j ][ i ] );
                 if( isValid( numCheck, num ) == false ) {
                     return false;
@@ -43,9 +36,6 @@ public:
     }
 
     bool checkRows( vector<vector<char>>& board ) {
-        const int numRows = board.size();
-        const int numCols = board[ 0 ].size();
-
         for( int j = 0; j < numRows; ++j ) {
             int numCheck = 0;
             for( int i = 0; i < numCols; ++i ) {
