@@ -18,65 +18,31 @@ class Solution {
     }
 
 public:
-    bool checkSquare( vector<vector<char>>& board, int x, int y ) {
-        const int subBoxEndX = (x + subBoxSize);
-        const int subBoxEndY = (y + subBoxSize);
+    bool isValidSudoku(vector<vector<char>>& board) {
+        int rowCheck[ numRows ];
+        int colCheck[ numCols ];
+        int gridCheck[ subBoxSize * subBoxSize ];
 
-        int numCheck = 0;
-        for( int j = y; j < subBoxEndY; ++j ) {
-            for( int i = x; i < subBoxEndX; ++i ) {
-                const int num = getNum( board[ j ][ i ] );
-                if( isValid( numCheck, num ) == false ) {
-                    return false;
-                }
-                markCell( numCheck, num );
-            }
-        }
-        return true;
-    }
-
-    bool checkRows( vector<vector<char>>& board ) {
         for( int j = 0; j < numRows; ++j ) {
-            int numCheck = 0;
             for( int i = 0; i < numCols; ++i ) {
                 const int num = getNum( board[ j ][ i ] );
-                if( isValid( numCheck, num ) == false ) {
+
+                const int gridId = ( i / subBoxSize ) + subBoxSize * ( j / subBoxSize );
+
+                if( isValid( rowCheck[ j ], num ) == false ) {
                     return false;
                 }
-                markCell( numCheck, num );
+                if( isValid( colCheck[ i ], num ) == false ) {
+                    return false;
+                }
+                if( isValid( gridCheck[ gridId ], num ) == false ) {
+                    return false;
+                }
+                markCell( rowCheck[ j ], num );
+                markCell( colCheck[ i ], num );
+                markCell( gridCheck[ gridId ], num );
             }
         }
         return true;
-    }
-
-    bool checkColumns( vector<vector<char>>& board ) {
-        const int numRows = board.size();
-        const int numCols = board[ 0 ].size();
-
-        for( int i = 0; i < numCols; ++i ) {
-            int numCheck = 0;
-            for( int j = 0; j < numRows; ++j ) {
-                const int num = getNum( board[ j ][ i ] );
-                if( isValid( numCheck, num ) == false ) {
-                    return false;
-                }
-                markCell( numCheck, num );
-            }
-        }
-        return true;
-    }
-
-    bool isValidSudoku(vector<vector<char>>& board) {
-        bool squareCheck = checkSquare( board, 0, 0 );
-        squareCheck = squareCheck && checkSquare( board, 0, 3 );
-        squareCheck = squareCheck && checkSquare( board, 0, 6 );
-        squareCheck = squareCheck && checkSquare( board, 3, 0 );
-        squareCheck = squareCheck && checkSquare( board, 3, 3 );
-        squareCheck = squareCheck && checkSquare( board, 3, 6 );
-        squareCheck = squareCheck && checkSquare( board, 6, 0 );
-        squareCheck = squareCheck && checkSquare( board, 6, 3 );
-        squareCheck = squareCheck && checkSquare( board, 6, 6 );
-
-        return checkRows( board ) && checkColumns( board ) && squareCheck;
     }
 };
