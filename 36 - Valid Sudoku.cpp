@@ -1,8 +1,18 @@
+struct cell_t {
+    int x;
+    int y;
+    set<char> canidates;
+};
+
+bool compare( const cell_t* cell0, const cell_t* cell1 ) {
+    return ( cell0->canidates.size() < cell1->canidates.size() );
+}
+
 class Solution {
-    static const int bitMask = ~0x3; // Each ascii value is assigned a bit, starts at '.' in ascii for speed. Non-numbers are masked from checks
-    static const int numRows = 9;
-    static const int numCols = 9;
-    static const int subBoxSize = 3;
+public:
+    uint32_t rowBits[ 9 ] = {};
+    uint32_t colBits[ 9 ] = {};
+    uint32_t boxBits[ 9 ] = {};
 
     inline static int getBitNum( const char pieceCode ) {
         const int result = pieceCode - '.'; // Ascii: . / 0 1 2 ... 9
@@ -10,41 +20,149 @@ class Solution {
     }
 
     inline static bool isValid( const uint32_t cellCheck, const int cellValue ) {
-        return !( cellCheck & ( 1 << cellValue ) & bitMask );
+        return !( cellCheck & ( 1 << cellValue ) & ~0x3 );
     }
 
-    inline static void markCell( uint32_t& cellCheck, const int cellValue ) {
+    inline static void setCellBit( uint32_t& cellCheck, const int cellValue ) {
         cellCheck |= ( 1 << cellValue );
     }
 
-public:
-    bool isValidSudoku(vector<vector<char>>& board) {
-        // For each row, column, and subGrid, check if a number was seen before. It's invalid if it was seen
-        // Use bitfields, for every possible check, to track if a number was seen 
+    inline static void clearCellBit( uint32_t& cellCheck, const int cellValue ) {
+        cellCheck &= ~( 1 << cellValue );
+    }
 
-        uint32_t rowCheck[ numRows ];
-        uint32_t colCheck[ numCols ];
-        uint32_t gridCheck[ subBoxSize * subBoxSize ];
+    inline static int getGridId( const int x, const int y ) {
+        return ( x / 3 ) + 3 * ( y / 3 ); // Requires integer division. Can't factor
+    }
 
-        // Process in row-order for better caching
-        for( int j = 0; j < numRows; ++j ) {
-            for( int i = 0; i < numCols; ++i ) {
-                const int bitNum = getBitNum( board[ j ][ i ] );
+    bool isValidCell( const vector<vector<char>>& board, const int x, const int y, const char value ) {
+        const int gridId = getGridId( x, y );
 
-                const int gridId = ( i / subBoxSize ) + subBoxSize * ( j / subBoxSize ); // Requires integer division. Can't factor
-                    
-                // Short-circuit. Rows will finish before grids, grids before columns
-                // Branch prediction should not expect this condition. When we *do* hit it, the program is done
-                const bool valid = isValid( rowCheck[ j ], bitNum  ) && isValid( gridCheck[ gridId ], bitNum ) && isValid( colCheck[ i ], bitNum );
-                if( !valid ) {
-                    return false;
+        const int bitNum = getBitNum( value );
+
+        return isValid( rowBits[ y ], bitNum ) && isValid( colBits[ x ], bitNum ) && isValid( boxBits[ gridId ], bitNum );
+    }
+
+    void markCell( vector<vector<char>>& board, const int x, const int y, const char value ) {
+        const int gridId = getGridId( x, y );
+        
+        board[ y ][ x ] = value;
+
+        const int bitNum = getBitNum( board[ y ][ x ] );
+
+        setCellBit( rowBits[ y ], bitNum );
+        setCellBit( colBits[ x ], bitNum );
+        setCellBit( boxBits[ gridId ], bitNum );
+    }
+
+    void clearCell( vector<vector<char>>& board, const int x, const int y ) {
+        const int gridId = getGridId( x, y );
+
+        const int bitNum = getBitNum( board[ y ][ x ] );
+
+        clearCellBit( rowBits[ y ], bitNum );
+        clearCellBit( colBits[ x ], bitNum );
+        clearCellBit( boxBits[ gridId ], bitNum );
+
+        board[ y ][ x ] = '.';
+    }
+
+    bool searchSolution( vector<vector<char>>& board, deque<cell_t*>& cells ) {
+        if ( cells.empty() ) {
+            return true;
+        }
+
+#ifdef PRINT_BOARD
+        for ( int j = 0; j < 9; ++j ) {
+            for ( int i = 0; i < 9; ++i ) {
+                cout << board[ j ][ i ] << ", ";
+            }
+            cout << endl;
+        }
+        cout << endl;
+#endif
+
+        while ( cells.empty() == false ) {
+            cell_t* cell = cells.front();
+            cells.pop_front();
+
+            for ( auto canidate : cell->canidates ) {
+                const int x = cell->x;
+                const int y = cell->y;
+
+                if ( isValidCell( board, x, y, canidate ) == false ) {
+                    continue;
+                }      
+                markCell( board, x, y, canidate );
+
+                if ( searchSolution( board, cells ) ) {
+                    return true;
                 }
-                // Mark numbers as seen
-                markCell( rowCheck[ j ], bitNum );
-                markCell( colCheck[ i ], bitNum );
-                markCell( gridCheck[ gridId ], bitNum );
+                clearCell( board, x, y );
+            }
+            cells.push_front( cell );
+            return false; // No canidates worked for cell, bad path
+        }
+        return false;
+    }
+
+    void solveSudoku(vector<vector<char>>& board) {
+        deque<cell_t*> cells;
+
+        char values[ 9 ] = { '1', '2', '3', '4', '5', '6', '7', '8', '9' };
+
+        // Cull invalid canidates
+        for( int j = 0; j < 9; ++j ) {
+            for( int i = 0; i < 9; ++i ) {
+                if( board[ j ][ i ] != '.' ) {
+                    continue;
+                }
+
+                set<char> canidateSet;
+                for( int v = 0; v < 9; ++v ) {
+                    canidateSet.insert( values[ v ] );
+                }
+
+                // Remove values from canidate set using the current row
+                for( int checkCol = 0; checkCol < 9; ++checkCol ) {
+                    if( board[ j ][ checkCol ] != '.' ) {
+                        const int value = board[ j ][ checkCol ];
+                        canidateSet.erase( value );
+                        markCell( board, checkCol, j, value );
+                    }
+                }
+
+                // Remove values from canidate set using the current column
+                for( int checkRow = 0; checkRow < 9; ++checkRow ) {
+                    if( board[ checkRow ][ i ] != '.' ) {
+                        const int value = board[ j ][ checkRow ];
+                        canidateSet.erase( value );
+                        markCell( board, checkRow, j, value );
+                    }
+                }
+
+                const int boxCornerX = 3 * ( i / 3 );
+                const int boxCornerY = 3 * ( j / 3 ); // Requires integer division. Can't factor
+
+                // Remove values from canidate set using the current subbox
+                for( int checkBoxY = boxCornerY; checkBoxY < boxCornerY + 3; ++checkBoxY ) {
+                    for( int checkBoxX = boxCornerX; checkBoxX < boxCornerX + 3; ++checkBoxX ) {
+                        if( board[ checkBoxY ][ checkBoxX ] != '.' ) {
+                            const int value = board[ checkBoxY ][ checkBoxX ];
+                            canidateSet.erase( value );
+                            markCell( board, checkBoxX, checkBoxY, value );
+                        }
+                    }
+                }
+                cell_t* cell = new cell_t();
+                cell->x = i;
+                cell->y = j;
+                cell->canidates = canidateSet;
+                cells.push_back( cell );
             }
         }
-        return true;
+        
+        sort( cells.begin(), cells.end(), compare );
+        searchSolution( board, cells );       
     }
 };
