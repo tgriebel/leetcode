@@ -4,6 +4,12 @@ struct cell_t {
     set<char> canidates;
 };
 
+class ValueMap {
+    uint32_t rowBits[ 9 ] = {};
+    uint32_t colBits[ 9 ] = {};
+    uint32_t boxBits[ 9 ] = {};
+};
+
 bool compare( const cell_t* cell0, const cell_t* cell1 ) {
     return ( cell0->canidates.size() < cell1->canidates.size() );
 }
@@ -13,6 +19,8 @@ public:
     uint32_t rowBits[ 9 ] = {};
     uint32_t colBits[ 9 ] = {};
     uint32_t boxBits[ 9 ] = {};
+
+    int gridIdLut[ 9 ][ 9 ] = {};
 
     inline static int getBitNum( const char pieceCode ) {
         const int result = pieceCode - '.'; // Ascii: . / 0 1 2 ... 9
@@ -28,11 +36,19 @@ public:
     }
 
     inline static void clearCellBit( uint32_t& cellCheck, const int cellValue ) {
-        cellCheck &= ~( 1 << cellValue );
+        cellCheck ^= ( 1 << cellValue );
     }
 
-    inline static int getGridId( const int x, const int y ) {
-        return ( x / 3 ) + 3 * ( y / 3 ); // Requires integer division. Can't factor
+    inline void buildGridIdLut() {
+        for( int j = 0; j < 9; ++j ) {
+            for( int i = 0; i < 9; ++i ) {
+                gridIdLut[ j ][ i ] = ( i / 3 ) + 3 * ( j / 3 ); // Requires integer division. Can't factor;
+            }
+        }
+    }
+
+    inline int getGridId( const int x, const int y ) {
+        return gridIdLut[ y ][ x ];
     }
 
     bool isValidCell( const vector<vector<char>>& board, const int x, const int y, const char value ) {
@@ -68,10 +84,6 @@ public:
     }
 
     bool searchSolution( vector<vector<char>>& board, deque<cell_t*>& cells ) {
-        if ( cells.empty() ) {
-            return true;
-        }
-
 #ifdef PRINT_BOARD
         for ( int j = 0; j < 9; ++j ) {
             for ( int i = 0; i < 9; ++i ) {
@@ -92,9 +104,12 @@ public:
 
                 if ( isValidCell( board, x, y, canidate ) == false ) {
                     continue;
-                }      
+                }
                 markCell( board, x, y, canidate );
 
+                if ( cells.empty() ) {
+                    return true;
+                }
                 if ( searchSolution( board, cells ) ) {
                     return true;
                 }
@@ -108,10 +123,13 @@ public:
 
     void solveSudoku(vector<vector<char>>& board) {
         deque<cell_t*> cells;
+        vector<cell_t*> cleanupList;
 
         char values[ 9 ] = { '1', '2', '3', '4', '5', '6', '7', '8', '9' };
 
-        // Cull invalid canidates
+        buildGridIdLut();
+
+        // Prune invalid canidates
         for( int j = 0; j < 9; ++j ) {
             for( int i = 0; i < 9; ++i ) {
                 if( board[ j ][ i ] != '.' ) {
@@ -159,10 +177,19 @@ public:
                 cell->y = j;
                 cell->canidates = canidateSet;
                 cells.push_back( cell );
+                cleanupList.push_back( cell );
             }
         }
         
+        // Presort based on cells with least options
         sort( cells.begin(), cells.end(), compare );
-        searchSolution( board, cells );       
+        searchSolution( board, cells );
+
+        for( auto cell : cleanupList ) {
+            if( cell != nullptr ) {
+                delete cell;
+            }
+        }
+        cleanupList.clear();
     }
 };
