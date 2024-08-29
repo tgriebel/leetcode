@@ -1,109 +1,97 @@
 struct cell_t {
-    int x;
-    int y;
-    set<char> canidates;
+    uint16_t x;
+    uint16_t y;
+	set<char>::iterator candidateItt;
+    set<char> candidates;
 };
 
-bool compare( const cell_t* cell0, const cell_t* cell1 ) {
-    return ( cell0->canidates.size() < cell1->canidates.size() );
-}
+class ValueMap {
+private:
+    static const int BoardSize = 9;
+    static const int BoxSize = 3;
 
-class Solution {
-public:
+    // 16bit for cache line efficiency
+    uint16_t rowBits[ BoardSize ];
+    uint16_t colBits[ BoardSize ];
+    uint16_t boxBits[ BoardSize ];
+
+    uint16_t gridIdLut[ BoardSize ][ BoardSize ] = {};
+
     inline static int getBitNum( const char pieceCode ) {
         const int result = pieceCode - '.'; // Ascii: . / 0 1 2 ... 9
         return result;
     }
 
-    inline static bool isValid( const uint32_t cellCheck, const int cellValue ) {
+    inline int getGridId( const int x, const int y ) {
+        return gridIdLut[ y ][ x ];
+    }
+
+    inline static bool isValid( const uint16_t cellCheck, const int cellValue ) {
         return !( cellCheck & ( 1 << cellValue ) & ~0x3 );
     }
 
-    inline static void markCell( uint32_t& cellCheck, const int cellValue ) {
+    inline static void setCellBit( uint16_t& cellCheck, const int cellValue ) {
         cellCheck |= ( 1 << cellValue );
     }
 
-    int isValidSudoku( vector<vector<char>>& board ) {
-        // For each row, column, and subGrid, check if a number was seen before. It's invalid if it was seen
-        // Use bitfields, for every possible check, to track if a number was seen 
-
-        uint32_t rowCheck[ 9 ] = {};
-        uint32_t colCheck[ 9 ] = {};
-        uint32_t gridCheck[ 9 ] = {};
-
-        // Process in row-order for better caching
-        for( int j = 0; j < 9; ++j ) {
-            for( int i = 0; i < 9; ++i ) {
-                const int bitNum = getBitNum( board[ j ][ i ] );
-
-                const int gridId = ( i / 3 ) + 3 * ( j / 3 ); // Requires integer division. Can't factor
-                    
-                // Short-circuit. Rows will finish before grids, grids before columns
-                // Branch prediction should not expect this condition. When we *do* hit it, the program is done
-                const bool valid = isValid( rowCheck[ j ], bitNum  ) && isValid( gridCheck[ gridId ], bitNum ) && isValid( colCheck[ i ], bitNum );
-                if( !valid ) {
-                    return 0;
-                }
-                // Mark numbers as seen
-                markCell( rowCheck[ j ], bitNum );
-                markCell( colCheck[ i ], bitNum );
-                markCell( gridCheck[ gridId ], bitNum );
-            }
-        }
-
-        bool isComplete = true;
-        for( int i = 0; i < 9; ++i ) {
-            // Check if '.' was encountered within any row
-            if( ( rowCheck[ i ] & 0x01 ) != 0 ) {
-                isComplete = false;
-                break;
-            }
-        }
-        return isComplete ? 2 : 1;
+    inline static void clearCellBit( uint16_t& cellCheck, const int cellValue ) {
+        cellCheck ^= ( 1 << cellValue );
     }
 
-    bool isValidCell( vector<vector<char>>& board, const int x, const int y ) {
-        uint32_t rowCheck = 0;
-        for( int i = 0; i < 9; ++i ) {
-            const int bitNum = getBitNum( board[ y ][ i ] );
-            if( !isValid( rowCheck, bitNum  ) ) {
-                return false;
-            }
-            markCell( rowCheck, bitNum );
-        }
-
-        uint32_t colCheck = 0;
-        for( int j = 0; j < 9; ++j ) {
-            const int bitNum = getBitNum( board[ j ][ x ] );
-            if( !isValid( colCheck, bitNum  ) ) {
-                return false;
-            }
-            markCell( colCheck, bitNum );
-        }
-
-        const int boxCornerX = 3 * ( x / 3 );
-        const int boxCornerY = 3 * ( y / 3 ); // Requires integer division. Can't factor
-
-        // Remove values from canidate set using the current subbox
-        uint32_t boxCheck = 0;
-        for( int checkBoxY = boxCornerY; checkBoxY < boxCornerY + 3; ++checkBoxY ) {
-            for( int checkBoxX = boxCornerX; checkBoxX < boxCornerX + 3; ++checkBoxX ) {
-                const int bitNum = getBitNum( board[ checkBoxY ][ checkBoxX ] );
-                if( !isValid( boxCheck, bitNum  ) ) {
-                    return false;
-                }
-                markCell( boxCheck, bitNum );
+public:
+    ValueMap() {
+        // Build grid ID LUT
+        for( int j = 0; j < BoardSize; ++j ) {
+            for( int i = 0; i < BoardSize; ++i ) {
+                gridIdLut[ j ][ i ] = ( i / BoxSize ) + BoxSize * ( j / BoxSize ); // Requires integer division. Can't factor;
             }
         }
-        return true;
+        Reset();
     }
 
-    bool searchSolution( vector<vector<char>>& board, deque<cell_t*>& cells ) {
-        if ( cells.empty() ) {
-            return true;
-        }
+    void Reset() {
+        memset( rowBits, 0, BoardSize * sizeof( rowBits[ 0 ] ) );
+        memset( colBits, 0, BoardSize * sizeof( colBits[ 0 ] ) );
+        memset( boxBits, 0, BoardSize * sizeof( boxBits[ 0 ] ) );
+    }
 
-#ifdef PRINT_BOARD
+    bool isValidCell( const int x, const int y, const char value ) {
+        const int gridId = getGridId( x, y );
+        const int bitNum = getBitNum( value );
+
+        return isValid( rowBits[ y ], bitNum ) && isValid( colBits[ x ], bitNum ) && isValid( boxBits[ gridId ], bitNum );
+    }
+
+    void markCell( const int x, const int y, const char value ) {
+        const int gridId = getGridId( x, y );    
+        const int bitNum = getBitNum( value );
+
+        setCellBit( rowBits[ y ], bitNum );
+        setCellBit( colBits[ x ], bitNum );
+        setCellBit( boxBits[ gridId ], bitNum );
+    }
+
+    void clearCell( const int x, const int y, const char value ) {
+        const int gridId = getGridId( x, y );
+        const int bitNum = getBitNum( value );
+
+        clearCellBit( rowBits[ y ], bitNum );
+        clearCellBit( colBits[ x ], bitNum );
+        clearCellBit( boxBits[ gridId ], bitNum );
+    }
+};
+
+bool compare( const cell_t* cell0, const cell_t* cell1 ) {
+    return ( cell0->candidates.size() < cell1->candidates.size() );
+}
+
+class Solution {
+public:
+    static constexpr char values[ 9 ] = { '1', '2', '3', '4', '5', '6', '7', '8', '9' };
+
+    ValueMap valueMap;
+
+    static void printBoard( const vector<vector<char>>& board ) {
         for ( int j = 0; j < 9; ++j ) {
             for ( int i = 0; i < 9; ++i ) {
                 cout << board[ j ][ i ] << ", ";
@@ -111,83 +99,144 @@ public:
             cout << endl;
         }
         cout << endl;
+    }
+	
+	bool searchSolutionNonRecursive() {
+        deque<cell_t*> visited;
+    
+        while ( cells.empty() == false ) {
+            cell_t* cell = cells.front();
+            cells.pop_front();
+
+            while ( cell->candidateItt != cell->candidates.end() ) {
+                const int x = cell->x;
+                const int y = cell->y;
+                const char candidate = *cell->candidateItt;
+
+                if ( valueMap.isValidCell( x, y, candidate ) == false ) {
+                    ++cell->candidateItt;
+                    continue;
+                }
+                board[ y ][ x ] = candidate;
+                valueMap.markCell( x, y, candidate );
+
+                // All cells have valid candidates places
+                if ( cells.empty() ) {
+                    return true;
+                }
+
+                // Restart search for next node
+                cell_t* nextCell = cells.front();
+                nextCell->candidateItt = nextCell->candidates.begin();
+                break;
+            }
+    
+            // Search failed for cell, back-track
+            if ( cell->candidateItt == cell->candidates.end() ) {
+                const int x = cell->x;
+                const int y = cell->y;
+
+                valueMap.clearCell( x, y, board[ y ][ x ] );
+                board[ y ][ x ] = '.';
+
+                //cell->candidateItt = cell->candidates.begin();
+                cells.push_front( cell );
+
+                if ( visited.empty() == false ) {
+                    cell_t* visitedCell = visited.front();
+
+                    // Try the next candidate
+                    if ( visitedCell->candidateItt != visitedCell->candidates.end() ) {
+                        ++visitedCell->candidateItt; 
+                    }
+
+                    valueMap.clearCell( visitedCell->x, visitedCell->y, board[ visitedCell->y ][ visitedCell->x ] );
+                    board[ visitedCell->y ][ visitedCell->x ] = '.';
+
+                    cells.push_front( visitedCell );
+                    visited.pop_front();
+                } else {
+                    return false;
+                }
+            } else {
+                visited.push_front( cell );
+            }
+        }
+    }
+
+    bool searchSolution( vector<vector<char>>& board, deque<cell_t*>& cells ) {
+#ifdef PRINT_BOARD
+        printBoard( board );
 #endif
 
         while ( cells.empty() == false ) {
             cell_t* cell = cells.front();
             cells.pop_front();
 
-            for ( auto canidate : cell->canidates ) {
+            for ( auto candidate : cell->candidates ) {
                 const int x = cell->x;
                 const int y = cell->y;
-                
-                board[ y ][ x ] = canidate;
-                if ( isValidCell( board, x, y ) == 0 ) {
-                    board[ y ][ x ] = '.';
+
+                if ( valueMap.isValidCell( x, y, candidate ) == false ) {
                     continue;
+                }
+                board[ y ][ x ] = candidate;
+                valueMap.markCell( x, y, candidate );
+
+                if ( cells.empty() ) {
+                    return true;
                 }
                 if ( searchSolution( board, cells ) ) {
                     return true;
                 }
+                valueMap.clearCell( x, y, candidate );
                 board[ y ][ x ] = '.';
             }
             cells.push_front( cell );
-            return false; // No canidates worked for cell, bad path
+            return false; // No candidates worked for cell, bad path
         }
         return false;
     }
 
-    void solveSudoku(vector<vector<char>>& board) {
+    void solveSudoku( vector<vector<char>>& board ) {
         deque<cell_t*> cells;
+        vector<cell_t*> cleanupList;
 
-        char values[ 9 ] = { '1', '2', '3', '4', '5', '6', '7', '8', '9' };
-
-        // Cull invalid canidates
+        // Find unsolved cells
         for( int j = 0; j < 9; ++j ) {
             for( int i = 0; i < 9; ++i ) {
                 if( board[ j ][ i ] != '.' ) {
+                    valueMap.markCell( i, j, board[ j ][ i ] );
                     continue;
-                }
-
-                set<char> canidateSet;
-                for( int v = 0; v < 9; ++v ) {
-                    canidateSet.insert( values[ v ] );
-                }
-
-                // Remove values from canidate set using the current row
-                for( int checkCol = 0; checkCol < 9; ++checkCol ) {
-                    if( board[ j ][ checkCol ] != '.' ) {
-                        canidateSet.erase( board[ j ][ checkCol ] );
-                    }
-                }
-
-                // Remove values from canidate set using the current column
-                for( int checkRow = 0; checkRow < 9; ++checkRow ) {
-                    if( board[ checkRow ][ i ] != '.' ) {
-                        canidateSet.erase( board[ j ][ checkRow ] );
-                    }
-                }
-
-                const int boxCornerX = 3 * ( i / 3 );
-                const int boxCornerY = 3 * ( j / 3 ); // Requires integer division. Can't factor
-
-                // Remove values from canidate set using the current subbox
-                for( int checkBoxY = boxCornerY; checkBoxY < boxCornerY + 3; ++checkBoxY ) {
-                    for( int checkBoxX = boxCornerX; checkBoxX < boxCornerX + 3; ++checkBoxX ) {
-                        if( board[ checkBoxY ][ checkBoxX ] != '.' ) {
-                            canidateSet.erase( board[ checkBoxY ][ checkBoxX ] );
-                        }
-                    }
-                }
+                }           
                 cell_t* cell = new cell_t();
                 cell->x = i;
                 cell->y = j;
-                cell->canidates = canidateSet;
+                
                 cells.push_back( cell );
+                cleanupList.push_back( cell );
+            }
+        }
+
+        // Populate candidate lists for unsolved cells
+        for( auto cell : cells ) {
+            for( int v = 0; v < 9; ++v ) {
+                if( valueMap.isValidCell( cell->x, cell->y, values[ v ] ) ) {
+                    cell->candidates.insert( values[ v ] );
+                }
             }
         }
         
+        // Presort based on cells with least options
         sort( cells.begin(), cells.end(), compare );
-        searchSolution( board, cells );       
+        searchSolution( board, cells );
+
+        // Clean-up
+        for( auto cell : cleanupList ) {
+            if( cell != nullptr ) {
+                delete cell;
+            }
+        }
+        cleanupList.clear();
     }
 };
